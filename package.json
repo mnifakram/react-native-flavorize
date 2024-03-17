@@ -1,14 +1,14 @@
 {
-  "name": "react-native-rename",
-  "version": "3.2.14",
-  "description": "Rename react-native app with just one command",
+  "name": "react-native-flavorize",
+  "version": "1.0.0",
+  "description": "Flavorize react-native app with just one command",
   "main": "lib/index.js",
   "scripts": {
     "test": "jest",
     "dev": "esbuild src/index.js --platform=node --bundle --outdir=lib --external:shelljs --watch",
     "build": "esbuild src/index.js --platform=node --bundle --outdir=lib --external:shelljs --minify --analyze",
     "prepublish": "npm run build",
-    "relink": "npm unlink react-native-rename && npm run prepublish && npm link",
+    "relink": "npm unlink react-native-flavorize && npm run prepublish && npm link",
     "format": "prettier --write 'src/*.{js,jsx}'",
     "lint": "eslint 'src/*.{js,jsx}'"
   },
@@ -25,7 +25,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/junedomingo/react-native-rename.git"
+    "url": "git+https://github.com/mnifakram/react-native-flavorize.git"
   },
   "keywords": [
     "react-native",
@@ -37,17 +37,17 @@
     "space"
   ],
   "author": {
-    "email": "junedomingo@gmail.com",
-    "name": "June Domingo"
+    "email": "mnifakram@gmail.com",
+    "name": "Akram Mnif"
   },
   "license": "MIT",
   "bin": {
-    "react-native-rename": "lib/index.js"
+    "react-native-flavorize": "lib/index.js"
   },
   "bugs": {
-    "url": "https://github.com/junedomingo/react-native-rename/issues"
+    "url": "https://github.com/mnifakram/react-native-flavorize/issues"
   },
-  "homepage": "https://github.com/junedomingo/react-native-rename#readme",
+  "homepage": "https://github.com/mnifakram/react-native-flavorize#readme",
   "devDependencies": {
     "esbuild": "^0.19.2",
     "eslint": "^8.47.0",

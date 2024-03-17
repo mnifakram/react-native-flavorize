@@ -99,7 +99,7 @@ export const validateNewName = (newName, programOptions) => {
   if (!isCleanNewNameLengthValid && !hasPathContentStr) {
     console.log(
       `Please provide path and content string using "-p [value]" or "--pathContentStr [value]" option to be used in renaming the folders, files and their contents.
-example: react-native-rename "${newName}" -p "[value]"`
+example: react-native-flavorize "${newName}" -p "[value]"`
     );
     process.exit();
   }
@@ -354,6 +354,19 @@ const updateElementInXml = async ({ filepath, selector, text }) => {
   console.log(toRelativePath(filepath), chalk.green('UPDATED'));
 };
 
+const updateAttributeInXml = async ({ filepath, selector, attrName, text }) => {
+  console.log(filepath);
+  const $ = cheerio.load(fs.readFileSync(filepath, 'utf8'), {
+    xmlMode: true,
+    decodeEntities: false,
+  });
+
+  const element = $(selector);
+  element.attr(attrName, encodeXmlEntities(text));
+  await fs.promises.writeFile(filepath, $.xml());
+  console.log(toRelativePath(filepath), chalk.green('UPDATED'));
+};
+
 export const updateIosNameInInfoPlist = async newName => {
   await updateElementInXml({
     filepath: globbySync(normalizePath(path.join(APP_PATH, iosAppDelegate)))[0].replace(
@@ -437,8 +450,6 @@ export const updateOtherFilesContent = async ({
     newName,
     currentPathContentStr,
     newPathContentStr,
-    appJsonName: appJsonContent?.name,
-    appJsonDisplayName: appJsonContent?.displayName,
     packageJsonName: packageJsonContent?.name,
     newAndroidBundleID,
     newIosBundleID,
@@ -476,7 +487,7 @@ ${chalk.green('SUCCESS! 🎉 🎉 🎉')} Your app has been renamed to "${chalk.
     chalk.yellow(`- Make sure to check old .xcodeproj and .xcworkspace in ios folder, please delete them manually.
 - Please make sure to run "npx pod-install" and "watchman watch-del-all" before running the app.
 
-If you like this tool, please give it a star on GitHub: https://github.com/junedomingo/react-native-rename
+If you like this tool, please give it a star on GitHub: https://github.com/mnifakram/react-native-flavorize
 
 `)
   );
@@ -503,5 +514,183 @@ export const checkPackageUpdate = async () => {
     }
   } catch (error) {
     console.log('Error checking for update:\n%O', error);
+  }
+};
+
+export const copyFiles = (files, prefix) => {
+  files.forEach(file => {
+    // Construct the shell command to copy the file with force option
+    const sourcePath = `${prefix}/${file.src}`;
+    // if (fs.lstatSync(sourcePath).isDirectory()) {
+
+    // }
+
+    const command = `cp -fR ${sourcePath} ${file.dest}`;
+
+    // Execute the command
+    const { code, _, stderr } = shell.exec(command);
+
+    // Check for errors
+    if (code !== 0) {
+      console.error(`Error copying ${sourcePath} to ${file.dest}: ${stderr}`);
+    } else {
+      console.log(chalk.green(`Successfully copied ${sourcePath} to ${file.dest}.`));
+    }
+  });
+};
+
+export const getFlavor = (filepath, key) => {
+  const jsonData = fs.readFileSync(filepath, 'utf8');
+  // Read the JSON file
+
+  try {
+    // Parse JSON data
+    const jsonObject = JSON.parse(jsonData);
+
+    // Check if the key exists in the object
+    if (key in jsonObject) {
+      return jsonObject[key];
+    } else {
+      throw new Error(`Key '${key}' not found in the JSON file.`);
+    }
+  } catch (error) {
+    console.error('Error reading JSON file:', error.message);
+
+    return null;
+  }
+};
+
+export const updateCodePushKey = async key => {
+  await updateElementInXml({
+    filepath: androidValuesStringsFullPath,
+    selector: 'resources > string[name="CodePushDeploymentKey"]',
+    text: key,
+  });
+  await updateElementInXml({
+    filepath: globbySync(normalizePath(path.join(APP_PATH, iosAppDelegate)))[0].replace(
+      'AppDelegate.h',
+      'Info.plist'
+    ),
+    selector: 'dict > key:contains("CodePushDeploymentKey") + string',
+    text: key,
+  });
+};
+
+export const updateBranchKey = async (liveKey, testKey) => {
+  await updateAttributeInXml({
+    filepath: path.join(APP_PATH, androidManifestXml),
+    selector: 'meta-data[android\\:name="io.branch.sdk.BranchKey"]',
+    attrName: 'android:value',
+    text: liveKey,
+  });
+  await updateAttributeInXml({
+    filepath: path.join(APP_PATH, androidManifestXml),
+    selector: 'meta-data[android\\:name="io.branch.sdk.BranchKey.test"]',
+    attrName: 'android:value',
+    text: testKey,
+  });
+  await updateElementInXml({
+    filepath: globbySync(normalizePath(path.join(APP_PATH, iosAppDelegate)))[0].replace(
+      'AppDelegate.h',
+      'Info.plist'
+    ),
+    selector: 'dict > key:contains("branch_key") + dict > key:contains("live") + string',
+    text: liveKey,
+  });
+  await updateElementInXml({
+    filepath: globbySync(normalizePath(path.join(APP_PATH, iosAppDelegate)))[0].replace(
+      'AppDelegate.h',
+      'Info.plist'
+    ),
+    selector: 'dict > key:contains("branch_key") + dict > key:contains("test") + string',
+    text: testKey,
+  });
+};
+
+export const updateBranchAppDomain = async domain => {
+  await updateElementInXml({
+    filepath: globbySync(normalizePath(path.join(APP_PATH, iosAppDelegate)))[0].replace(
+      'AppDelegate.h',
+      'Info.plist'
+    ),
+    selector: 'dict > key:contains("branch_app_domain") + string',
+    text: domain,
+  });
+};
+
+export const updateUriScheme = async (bundleIdentifier, uriScheme) => {
+  const selector = 'intent-filter[android\\:label="uriScheme"] > data:first-child';
+  await updateAttributeInXml({
+    filepath: path.join(APP_PATH, androidManifestXml),
+    selector,
+    attrName: 'android:scheme',
+    text: uriScheme,
+  });
+
+  await updateElementInXml({
+    filepath: globbySync(normalizePath(path.join(APP_PATH, iosAppDelegate)))[0].replace(
+      'AppDelegate.h',
+      'Info.plist'
+    ),
+    selector: 'key:contains(CFBundleURLName) + string',
+    text: bundleIdentifier,
+  });
+  await updateElementInXml({
+    filepath: globbySync(normalizePath(path.join(APP_PATH, iosAppDelegate)))[0].replace(
+      'AppDelegate.h',
+      'Info.plist'
+    ),
+    selector: 'key:contains(CFBundleURLSchemes) + array string:first-of-type',
+    text: uriScheme,
+  });
+};
+
+export const updateAppLinks = async branchSettings => {
+  await updateAttributeInXml({
+    filepath: path.join(APP_PATH, androidManifestXml),
+    selector: 'intent-filter[android\\:label="appLinks"] > data:nth-child(4)',
+    attrName: 'android:host',
+    text: branchSettings.domain,
+  });
+  await updateAttributeInXml({
+    filepath: path.join(APP_PATH, androidManifestXml),
+    selector: 'intent-filter[android\\:label="appLinks"] > data:nth-child(5)',
+    attrName: 'android:host',
+    text: branchSettings.alternateDomain,
+  });
+  await updateAttributeInXml({
+    filepath: path.join(APP_PATH, androidManifestXml),
+    selector: 'intent-filter[android\\:label="appLinks"] > data:nth-child(6)',
+    attrName: 'android:host',
+    text: branchSettings.testDomain,
+  });
+  await updateAttributeInXml({
+    filepath: path.join(APP_PATH, androidManifestXml),
+    selector: 'intent-filter[android\\:label="appLinks"] > data:nth-child(7)',
+    attrName: 'android:host',
+    text: branchSettings.testAlternateDomain,
+  });
+};
+
+export const validateData = (environment, data) => {
+  const envKeys = data[environment];
+
+  if (!envKeys) {
+    console.log(chalk.red(`No keys found for environment ${chalk.bold(environment)}`));
+    process.exit();
+  }
+  const isValidCodePushKey =
+    environment === 'staging' || (envKeys.codepush && envKeys.codepush.key.length > 6);
+
+  if (!isValidCodePushKey) {
+    console.log(chalk.red(`No codepush keys found for environment ${chalk.bold(environment)}`));
+    process.exit();
+  }
+
+  const isValidBranchSettings = envKeys.branch && envKeys.branch.key.length > 6;
+
+  if (!isValidBranchSettings) {
+    console.log(chalk.red(`No branch keys found for environment ${chalk.bold(environment)}`));
+    process.exit();
   }
 };

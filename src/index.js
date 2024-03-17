@@ -7,8 +7,10 @@ import {
   checkGitRepoStatus,
   checkPackageUpdate,
   cleanBuilds,
+  copyFiles,
   getAndroidCurrentBundleID,
   getAndroidCurrentName,
+  getFlavor,
   getIosCurrentName,
   getIosXcodeProjectPathName,
   gitStageChanges,
@@ -18,10 +20,16 @@ import {
   updateAndroidFilesContent,
   updateAndroidFilesContentBundleID,
   updateAndroidNameInStringsXml,
+  updateAppLinks,
+  updateBranchAppDomain,
+  updateBranchKey,
+  updateCodePushKey,
   updateIosFilesContent,
   updateIosNameInInfoPlist,
   updateOtherFilesContent,
+  updateUriScheme,
   validateCreation,
+  validateData,
   validateGitRepo,
   validateNewBundleID,
   validateNewName,
@@ -33,17 +41,11 @@ program
   .description(pjson.description)
   .version(pjson.version)
   .arguments('[newName]')
-  .option(
-    '-b, --bundleID [value]',
-    'Set custom bundle identifier for both ios and android eg. "com.example.app" or "com.example".'
-  )
-  .option('--iosBundleID [value]', 'Set custom bundle identifier specifically for ios')
-  .option('--androidBundleID [value]', 'Set custom bundle identifier specifically for android')
-  .option(
-    '-p, --pathContentStr [value]',
-    `Path and content string that can be used in replacing folders, files and their content. Make sure it doesn't include any special characters.`
-  )
   .option('--skipGitStatusCheck', 'Skip git repo status check')
+  .option('-f, --falvorFilePath [value]', 'Json file that contains the flavors')
+  .option('-n --flavorName [value]', 'Name of the flavor')
+  .option('--branch', 'Update Branch.io keys and uriScheme')
+  .option('--codePush', 'Update codePush keys')
   .action(async newName => {
     validateCreation();
     validateGitRepo();
@@ -56,31 +58,31 @@ program
 
     validateNewName(newName, options);
 
-    const pathContentStr = options.pathContentStr;
-    const newBundleID = options.bundleID;
-    const newIosBundleID = options.iosBundleID;
-    const newAndroidBundleID = options.androidBundleID;
+    let newBundleID;
+    const flavorsFilePath = options.falvorFilePath;
+    const flavorName = options.flavorName;
+    const updateBranchSettings = options.branch;
+    const updateCodePushSettings = options.codePush;
+    const flavorData = getFlavor(flavorsFilePath, flavorName);
 
-    if (pathContentStr) {
-      validateNewPathContentStr(pathContentStr);
+    // validateData(flavorData);
+
+    if (!newBundleID) {
+      newBundleID = flavorData.bundleIdentifier;
+    }
+
+    if (flavorsFilePath) {
+      validateNewPathContentStr(flavorsFilePath);
     }
 
     if (newBundleID) {
       validateNewBundleID(newBundleID, ['ios', 'android']);
     }
 
-    if (newIosBundleID) {
-      validateNewBundleID(newIosBundleID, ['ios']);
-    }
-
-    if (newAndroidBundleID) {
-      validateNewBundleID(newAndroidBundleID, ['android']);
-    }
-
     const currentAndroidName = getAndroidCurrentName();
     const currentIosName = getIosCurrentName();
     const currentPathContentStr = getIosXcodeProjectPathName();
-    const newPathContentStr = pathContentStr || newName;
+    const newPathContentStr = newName;
     const currentAndroidBundleID = getAndroidCurrentBundleID();
 
     await renameIosFoldersAndFiles(newPathContentStr);
@@ -89,32 +91,30 @@ program
       newName,
       currentPathContentStr,
       newPathContentStr,
-      newBundleID: newIosBundleID || newBundleID,
+      newBundleID: newBundleID,
     });
 
     await updateIosNameInInfoPlist(newName);
 
-    if (newAndroidBundleID || newBundleID) {
+    if (newBundleID) {
       await renameAndroidBundleIDFolders({
         currentBundleIDAsPath: bundleIDToPath(currentAndroidBundleID),
-        newBundleIDAsPath: bundleIDToPath(newAndroidBundleID || newBundleID),
+        newBundleIDAsPath: bundleIDToPath(newBundleID),
       });
     }
 
     await updateAndroidFilesContent({
       currentName: currentAndroidName,
       newName,
-      newBundleIDAsPath: bundleIDToPath(
-        newAndroidBundleID || newBundleID || currentAndroidBundleID
-      ),
+      newBundleIDAsPath: bundleIDToPath(newBundleID || currentAndroidBundleID),
     });
 
-    if (newAndroidBundleID || newBundleID) {
+    if (newBundleID) {
       await updateAndroidFilesContentBundleID({
         currentBundleID: currentAndroidBundleID,
-        newBundleID: newAndroidBundleID || newBundleID,
+        newBundleID,
         currentBundleIDAsPath: bundleIDToPath(currentAndroidBundleID),
-        newBundleIDAsPath: bundleIDToPath(newAndroidBundleID || newBundleID),
+        newBundleIDAsPath: bundleIDToPath(newBundleID),
       });
     }
 
@@ -124,14 +124,32 @@ program
       currentPathContentStr,
       newPathContentStr,
       currentIosName,
-      newAndroidBundleID: newAndroidBundleID || newBundleID,
-      newIosBundleID: newIosBundleID || newBundleID,
+      newAndroidBundleID: newBundleID,
+      newIosBundleID: newBundleID,
     });
 
+    if (updateBranchSettings) {
+      // update branch key and secret
+      await updateBranchKey(flavorData.branch.live, flavorData.branch.test);
+      // update uriScheme
+      await updateUriScheme(newBundleID, flavorData.uriScheme);
+      // update App Domain
+      await updateBranchAppDomain(flavorData.branch.domain);
+      // update App Links
+      await updateAppLinks(flavorData.branch);
+    }
+
+    if (updateCodePushSettings) {
+      // update code push key
+      await updateCodePushKey(flavorData.codepush.key);
+    }
+    if (flavorData.files) {
+      copyFiles(flavorData.files, flavorData.folderName);
+    }
     cleanBuilds();
     showSuccessMessages(newName);
     gitStageChanges();
-    checkPackageUpdate();
+    // checkPackageUpdate();
   });
 
 // If no arguments are passed, show help
