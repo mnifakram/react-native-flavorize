@@ -5,7 +5,7 @@ import pjson from '../package.json';
 import {
   bundleIDToPath,
   checkGitRepoStatus,
-  checkPackageUpdate,
+  // checkPackageUpdate,
   cleanBuilds,
   copyFiles,
   getAndroidCurrentBundleID,
@@ -21,6 +21,7 @@ import {
   updateAndroidFilesContentBundleID,
   updateAndroidNameInStringsXml,
   updateAppLinks,
+  updateBugfenderKey,
   updateBranchAppDomain,
   updateBranchKey,
   updateCodePushKey,
@@ -29,7 +30,7 @@ import {
   updateOtherFilesContent,
   updateUriScheme,
   validateCreation,
-  validateData,
+  // validateData,
   validateGitRepo,
   validateNewBundleID,
   validateNewName,
@@ -46,6 +47,7 @@ program
   .option('-n --flavorName [value]', 'Name of the flavor')
   .option('--branch', 'Update Branch.io keys and uriScheme')
   .option('--codePush', 'Update codePush keys')
+  .option('--bugfender', 'Update bugfender keys')
   .action(async newName => {
     validateCreation();
     validateGitRepo();
@@ -63,6 +65,7 @@ program
     const flavorName = options.flavorName;
     const updateBranchSettings = options.branch;
     const updateCodePushSettings = options.codePush;
+    const updateBugfender = options.bugfender;
     const flavorData = getFlavor(flavorsFilePath, flavorName);
 
     // validateData(flavorData);
@@ -142,6 +145,11 @@ program
     if (updateCodePushSettings) {
       // update code push key
       await updateCodePushKey(flavorData.codepush.key);
+    }
+
+    if (updateBugfender) {
+      // update bugfender key
+      await updateBugfenderKey(flavorData.bugfender.key);
     }
     if (flavorData.files) {
       copyFiles(flavorData.files, flavorData.folderName);

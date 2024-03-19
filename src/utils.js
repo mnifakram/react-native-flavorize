@@ -576,6 +576,21 @@ export const updateCodePushKey = async key => {
   });
 };
 
+export const updateBugfenderKey = async newValue => {
+  const options = {
+    files: 'app.json',
+    from: /("BugfenderKey"\s*:\s*")([^"]*)(")/,
+    to: `$1${newValue}$3`,
+  };
+
+  try {
+    await replace(options);
+    console.log('BugfenderKey updated');
+  } catch (error) {
+    console.error('Error occurred while changing BugfenderKey', error);
+  }
+};
+
 export const updateBranchKey = async (liveKey, testKey) => {
   await updateAttributeInXml({
     filepath: path.join(APP_PATH, androidManifestXml),
